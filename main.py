@@ -1,5 +1,3 @@
-# streamlit app
-
 # main.py
 import streamlit as st
 from orchestrator import MultiAgentOrchestrator
@@ -70,108 +68,88 @@ if st.button("🚀 Analyze with Multi-Agent System", type="primary"):
                 orchestrator = MultiAgentOrchestrator()
                 report = orchestrator.run(query)
                 
-                # Show success
-                st.success(f"✅ Analysis complete! Execution time: {report['execution_time_seconds']}s")
+                # Check if report has success field
+                if not report.get("success", True):
+                    st.error(f"❌ Analysis failed: {report.get('error', 'Unknown error')}")
+                    if report.get('warnings'):
+                        for warning in report['warnings']:
+                            st.warning(warning)
+                    st.stop()
+                
+                # Show success with safety indicators
+                if report.get("human_review", {}).get("required"):
+                    st.warning(f"⚠️ Human review recommended: {report['human_review']['reason']}")
+                else:
+                    st.success(f"✅ Analysis complete! Execution time: {report['execution_time_seconds']}s")
                 
                 # Show metrics
-                col1, col2 = st.columns(2)
+                col1, col2, col3, col4 = st.columns(4)
                 with col1:
-                    st.metric("⏱️ Execution Time", f"{report['execution_time_seconds']}s")
+                    st.metric("⏱️ Time", f"{report['execution_time_seconds']}s")
                 with col2:
-                    st.metric("🤖 Agents Used", report['agents_executed'])
+                    st.metric("🤖 Agents", report['agents_executed'])
+                with col3:
+                    conf = report.get('safety', {}).get('confidence_scores', {}).get('average', 0)
+                    st.metric("🎯 Confidence", f"{conf:.0%}")
+                with col4:
+                    errors = report.get('reliability', {}).get('error_count', 0)
+                    st.metric("❌ Errors", errors)
+                
+                # Safety warnings
+                if report.get('safety', {}).get('warnings'):
+                    with st.expander("⚠️ Safety Warnings", expanded=True):
+                        for warning in report['safety']['warnings']:
+                            st.warning(warning)
                 
                 st.markdown("---")
                 
                 # Show results in tabs
-                tab1, tab2, tab3 = st.tabs(["📥 Data Collection", "📊 Analysis", "💡 Insights"])
+                tab1, tab2, tab3, tab4 = st.tabs([
+                    "📥 Data Collection", 
+                    "📊 Analysis", 
+                    "💡 Insights",
+                    "🔍 Execution Details"
+                ])
                 
                 with tab1:
                     st.markdown("### Data Collection Phase")
+                    conf = report.get('safety', {}).get('confidence_scores', {}).get('data_collection', 0)
+                    st.caption(f"Confidence: {conf:.0%}")
                     st.write(report['results']['data_collection'])
                 
                 with tab2:
                     st.markdown("### Analysis Phase")
+                    conf = report.get('safety', {}).get('confidence_scores', {}).get('analysis', 0)
+                    st.caption(f"Confidence: {conf:.0%}")
                     st.write(report['results']['analysis'])
                 
                 with tab3:
                     st.markdown("### Insights & Recommendations")
+                    conf = report.get('safety', {}).get('confidence_scores', {}).get('insights', 0)
+                    st.caption(f"Confidence: {conf:.0%}")
                     st.write(report['results']['insights'])
+                
+                with tab4:
+                    st.markdown("### Execution Details")
+                    
+                    st.write("**Safety Checks:**")
+                    st.json(report.get('safety', {}))
+                    
+                    st.write("**Reliability Metrics:**")
+                    st.json(report.get('reliability', {}))
+                    
+                    st.write("**Human Review Status:**")
+                    st.json(report.get('human_review', {}))
                 
             except Exception as e:
                 st.error(f"❌ Error: {str(e)}")
                 st.write("Please check your OpenAI API key and try again.")
+                import traceback
+                with st.expander("🔍 Debug Details"):
+                    st.code(traceback.format_exc())
     else:
         st.warning("⚠️ Please enter a query above")
-
-
-        # Show success with safety indicators
-        if report.get("human_review", {}).get("required"):
-                    st.warning(f"⚠️ Human review recommended: {report['human_review']['reason']}")
-        else:
-            st.success(f"✅ Analysis complete! Execution time: {report['execution_time_seconds']}s")
-                    
-                # Show metrics
-        col1, col2, col3, col4 = st.columns(4)
-        with col1:
-            st.metric("⏱️ Time", f"{report['execution_time_seconds']}s")
-        with col2:
-            st.metric("🤖 Agents", report['agents_executed'])
-        with col3:
-            conf = report['safety']['confidence_scores']['average']
-            st.metric("🎯 Confidence", f"{conf:.0%}")
-        with col4:
-            errors = report['reliability']['error_count']
-            st.metric("❌ Errors", errors)
-                
-                # Safety warnings
-        if report['safety']['warnings']:
-            with st.expander("⚠️ Safety Warnings", expanded=True):
-                for warning in report['safety']['warnings']:
-                        st.warning(warning)
-                
-            st.markdown("---")
-                
-                # Show results in tabs
-        tab1, tab2, tab3, tab4 = st.tabs([
-            "📥 Data Collection", 
-            "📊 Analysis", 
-            "💡 Insights",
-            "🔍 Execution Details"
-        ])
-                
-        with tab1:
-            st.markdown("### Data Collection Phase")
-            conf = report['safety']['confidence_scores']['data_collection']
-            st.caption(f"Confidence: {conf:.0%}")
-            st.write(report['results']['data_collection'])
-                
-        with tab2:
-            st.markdown("### Analysis Phase")
-            conf = report['safety']['confidence_scores']['analysis']
-            st.caption(f"Confidence: {conf:.0%}")
-            st.write(report['results']['analysis'])
-                
-        with tab3:
-            st.markdown("### Insights & Recommendations")
-            conf = report['safety']['confidence_scores']['insights']
-            st.caption(f"Confidence: {conf:.0%}")
-            st.write(report['results']['insights'])
-                
-        with tab4:
-            st.markdown("### Execution Details")
-                    
-            st.write("**Safety Checks:**")
-            st.json(report['safety'])
-                    
-            st.write("**Reliability Metrics:**")
-            st.json(report['reliability'])
-                    
-            st.write("**Human Review Status:**")
-            st.json(report['human_review'])
 
 # Footer
 st.markdown("---")
 st.caption("Multi-Agent Business Analyzer | Built with Streamlit & LangChain")
-
-
-
